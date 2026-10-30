@@ -64,6 +64,42 @@
   th .arrow { display: inline-block; width: 10px; margin-left: 4px; vertical-align: bottom; }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .table-wrap { overflow-x: auto; }
+
+  .sort-mobile { display: none; align-items: center; gap: 8px; font-family: "BentonStrong"; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  #sort-select {
+    flex: 1;
+    font-family: "Benton";
+    font-size: 13px;
+    color: #000;
+    padding: 5px 28px 5px 8px;
+    border: 1px solid #000;
+    border-radius: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23000'/%3E%3C/svg%3E") no-repeat right 10px center;
+  }
+  #sort-select:focus { outline: none; }
+
+  /* Phones: stack each row as a card so nothing scrolls sideways */
+  @media (max-width: 640px) {
+    .toolbar { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 12px; }
+    .tabs { flex-wrap: nowrap; }
+    .tabs .toggle-btn { flex: 1; min-width: 0; padding: 6px 0; }
+    #search { width: 100%; }
+    .sort-mobile { display: flex; }
+    .table-wrap { overflow-x: visible; }
+    thead { display: none; }
+    table, tbody { display: block; }
+    tbody { border-top: 2px solid #000; }
+    tbody tr { display: grid; grid-template-columns: 24px 1fr auto; column-gap: 8px; padding: 10px 0; border-bottom: 1px solid #ccc; }
+    tbody tr.empty-row { display: block; }
+    tbody td { border: 0; padding: 0; }
+    td.rank { grid-column: 1; text-align: left; }
+    td.donor { grid-column: 2; }
+    td.amount { grid-column: 3; }
+    td.party, td.sector, td.dark { grid-column: 2 / -1; font-size: 12px; padding-top: 3px; }
+    td.party::before, td.sector::before, td.dark::before { content: attr(data-label) ": "; font-family: "BentonStrong"; }
+  }
 </style>
 </head>
 <body>
@@ -75,6 +111,17 @@
     <div class="toolbar">
       <div class="tabs" role="tablist" id="tabs"></div>
       <input type="search" id="search" placeholder="Search in table" aria-label="Search donors">
+      <label class="sort-mobile">Sort by
+        <select id="sort-select">
+          <option value="rank:1">Rank</option>
+          <option value="amount:-1">Contributions: high to low</option>
+          <option value="amount:1">Contributions: low to high</option>
+          <option value="donor:1">Donor A–Z</option>
+          <option value="party:1">Party Supported</option>
+          <option value="sector:1">Sector</option>
+          <option value="dark:1">Dark Money?</option>
+        </select>
+      </label>
     </div>
     <div class="table-wrap">
       <table>
@@ -102,6 +149,7 @@ const tabs = document.getElementById("tabs");
 const rows = document.getElementById("rows");
 const contribHead = document.getElementById("contrib-head");
 const search = document.getElementById("search");
+const sortSelect = document.getElementById("sort-select");
 let current = defaultYear;
 let sortKey = "rank";
 let sortDir = 1;
@@ -146,15 +194,17 @@ function show(year) {
   });
   contribHead.innerHTML = esc(d.contribLabel).replace(" through ", "<br>through ");
   rows.innerHTML = matches.length === 0
-    ? `<tr><td class="empty" colspan="6">No donors match “${esc(search.value.trim())}” in ${year}.</td></tr>`
+    ? `<tr class="empty-row"><td class="empty" colspan="6">No donors match “${esc(search.value.trim())}” in ${year}.</td></tr>`
     : matches.map(r => `<tr>
-    <td class="num">${esc(r.rank)}</td>
+    <td class="num rank">${esc(r.rank)}</td>
     <td class="donor">${hl(r.donor, q)}</td>
-    <td class="num">${fmt.format(r.amount)}</td>
-    <td>${hl(r.party, q)}</td>
-    <td>${hl(r.sector, q)}</td>
-    <td>${hl(r.dark, q)}</td>
+    <td class="num amount">${fmt.format(r.amount)}</td>
+    <td class="party" data-label="Party">${hl(r.party, q)}</td>
+    <td class="sector" data-label="Sector">${hl(r.sector, q)}</td>
+    <td class="dark" data-label="Dark money">${hl(r.dark, q)}</td>
   </tr>`).join("");
+  const opt = sortSelect.querySelector(`option[value="${sortKey}:${sortDir}"]`);
+  if (opt) sortSelect.value = opt.value;
   tabs.querySelectorAll("button").forEach(b => {
     b.classList.toggle("active", b.dataset.year === year);
     b.setAttribute("aria-selected", b.dataset.year === year);
@@ -182,6 +232,12 @@ document.querySelectorAll("th[data-key]").forEach(th => {
     }
     show(current);
   });
+});
+sortSelect.addEventListener("change", () => {
+  const [key, dir] = sortSelect.value.split(":");
+  sortKey = key;
+  sortDir = Number(dir);
+  show(current);
 });
 search.addEventListener("input", () => show(current));
 show(defaultYear);
