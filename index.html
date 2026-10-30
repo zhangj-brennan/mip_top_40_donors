@@ -39,6 +39,9 @@
   #search:focus { outline: none; box-shadow: none; }
   td.empty { text-align: center; padding: 20px 8px; }
   mark { background: var(--yellow); color: #000; padding: 0; }
+  .download { margin-top: 16px; font-size: 13px; }
+  .download a { font-family: "BentonStrong"; color: #000; text-decoration: underline; }
+  .download a:hover { color: var(--accent); }
 
   table {
     width: 100%;
@@ -138,11 +141,15 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
+    <p class="download"><a href="#" id="download-link">Download the data</a></p>
   </div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const CSV_DIR = "Top 40 Donors 2014-2026 csv/";
 const DATA = {};
+const RAW = {};
+const SOURCE = "Source: Brennan Center analysis of Federal Election Commission data";
 const years = ["2014", "2018", "2022", "2026"];
 const defaultYear = "2026";
 const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -296,11 +303,28 @@ sortSelect.addEventListener("change", () => {
 });
 search.addEventListener("input", () => show(current));
 
+// Zip the same CSV files the table was built from, so the download always matches what's shown
+document.getElementById("download-link").addEventListener("click", e => {
+  e.preventDefault();
+  if (years.some(y => !RAW[y])) return;
+  const zip = new JSZip();
+  years.forEach(y => zip.file(`top_40_donors_${y}.csv`, RAW[y].replace(/\s*$/, "\n") + "\n" + SOURCE + "\n"));
+  zip.generateAsync({ type: "blob" }).then(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "top_40_donors_2014-2026.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+});
+
 rows.innerHTML = `<tr class="empty-row"><td class="empty" colspan="6">Loading…</td></tr>`;
 Promise.all(years.map(y =>
   fetch(encodeURI(CSV_DIR + y + ".csv"), { cache: "no-cache" })
     .then(res => { if (!res.ok) throw new Error(`Could not load ${y}.csv (${res.status})`); return res.text(); })
-    .then(text => { DATA[y] = toYearData(text, y); })
+    .then(text => { RAW[y] = text; DATA[y] = toYearData(text, y); })
 ))
   .then(() => show(defaultYear))
   .catch(err => {
