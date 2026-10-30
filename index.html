@@ -185,6 +185,16 @@ document.querySelectorAll("th[data-key]").forEach(th => {
 });
 search.addEventListener("input", () => show(current));
 show(defaultYear);
+
+// Tell an embedding page how tall the content is so the iframe can fit it without scrolling
+const container = document.getElementById("container");
+function postHeight() {
+  if (window.parent === window) return;
+  const h = Math.ceil(container.getBoundingClientRect().height) + 20;
+  window.parent.postMessage({ mipTop40Height: h }, "*");
+}
+new ResizeObserver(postHeight).observe(container);
+window.addEventListener("load", postHeight);
 </script>
 </body>
 </html>
